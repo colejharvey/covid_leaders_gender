@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "Getting data from Affective tweets"
 output: html_notebook
 ---
 
@@ -8,6 +8,7 @@ library(RWeka)
 library(tidyverse)
 training_data <- read.arff("affective_tweets_training_data.arff")
 ```
+
 
 Interacting negative word count with emotions
 ```{r}

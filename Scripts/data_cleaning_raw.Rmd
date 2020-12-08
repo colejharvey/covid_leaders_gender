@@ -1,0 +1,128 @@
+---
+title: "Cleaning raw files"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(quanteda)
+library(RWeka)
+
+#Load in appropriate dataset here
+```
+
+
+Steps for going in and out of arff for emotion words:
+1) Get raw tweets
+2) Lower case the tweets
+3) Code covid tweets using keywords
+4) Subset tweets if needed
+5) Make text a character vector
+6) Make created_at a date vector
+7) Remove hashtags column
+8) Turn is_quote and is_retweet into numeric variables
+9) Remove line breaks using mutate(text = str_replace_all(text, "[\r\n]" , ""))
+10) Write file as arff using foreign::write.arff
+11) Read into Weka. Run filter.
+12) Remove text and location variables
+13) Save file
+14) Load resulting file into R and merge with tweets dataset as necessary
+
+Other notes to be aware of:
+A) At some point in this process, R rounded status_id, making it useless as an id for each observation. For merging, etc, use a combination of user_id and created_at.
+
+###Messy overview, more of a scratch pad
+
+```{r}
+data1 <- read.csv("./Data/electeds tweets 10-6-20.csv")
+data2 <- read.csv("./Data/electeds tweets dec-04-20.csv")
+
+data1 <- data1 %>% dplyr::select(user_id:followers_count)
+data2 <- data2 %>% dplyr::select(user_id:followers_count)
+
+data1 <- rbind(data1, data2)
+
+data1 <- data1 %>% mutate(text2 = tolower(as.character(text)))
+
+
+data1 <- data1 %>% mutate(covid_tweet = ifelse(grepl("covid | covid-19 | coronavirus | epidemic | pandemic | sars-cov-2 | wuhan | distanc* | #stayathome | #saferathome | shutdown | lockdown | lock* down | slow the spread | #slowthespread | physical* distanc* | social* distanc* | shelter in place | shelter-in-place | chin* virus | kung flu", as.character(data1$text2)) == TRUE, 1, 0))
+data1 <- data1 %>% select(-hashtags)
+data1 <- data1 %>% select(-text2)
+
+covid_tweets <- data1 %>% filter(covid_tweet == 1)
+
+covid_tweets <- covid_tweets %>% mutate(text = as.character(text))
+covid_tweets <- covid_tweets %>% mutate(created_at = mdy_hms(created_at))
+covid_tweets <- covid_tweets %>% mutate(is_quote = ifelse(is_quote == TRUE, 1, 0))
+covid_tweets <- covid_tweets %>% mutate(is_retweet = ifelse(is_retweet == TRUE, 1, 0))
+
+
+covid_tweets <- covid_tweets %>% mutate(text = str_replace_all(text, "[\r\n]" , ""))
+
+write.csv(covid_tweets, "covid_tweets.csv")
+foreign::write.arff(covid_tweets, "covid_tweets.arff")
+
+
+
+covid_tweets <- read.csv("covid_tweets.csv")
+emotions <- read.csv("covid_tweets2.csv")
+covid_tweets <- arrange(covid_tweets, desc(status_id))
+
+
+
+
+tweets_data <- covid_tweets %>% filter(is_quote == FALSE & is_retweet == FALSE) %>% dplyr::select(status_id, favorite_count, retweet_count, followers_count)
+
+covid_tweets_data <- emotions %>% left_join(x = tweets_data, by = "status_id")
+
+
+covid_tweets_data <- read.arff("covid_tweets.arff")
+
+```
+
+
+
+###Putting all text in lower case
+
+```{r}
+data1 <- data1 %>% mutate(text = tolower(text))
+```
+
+
+###Coding covid related tweets
+
+```{r}
+data1 <- data1 %>% mutate(covid_tweet = ifelse(grepl("covid | covid-19 | coronavirus | epidemic | pandemic | sars-cov-2 | wuhan | distanc* | #stayathome | #saferathome | shutdown | lockdown | lock* down | slow the spread | #slowthespread | physical* distanc* | social* distanc* | shelter in place | shelter-in-place | chin* virus | kung flu", data1$text) == TRUE, 1, 0))
+```
+
+###Inflammatory tweets (subset of covid)
+
+CH note: I am not sure whether to include 'Wuhan', since it will also capture some non-racist early tweets about the virus. For now it is included.
+```{r}
+data1 <- data1 %>% mutate(inflammatory_covid_tweet = ifelse(grepl("wuhan | chin* virus | kung flu", data1$text) == TRUE, 1, 0))
+```
+
+###Economy tweets
+
+```{r}
+data1 <- data1 %>% mutate(economy_tweet = ifelse(grepl("business* | jobs | economy | reopen* | opening | relaunch | restart | workforce | economic | easing restrictions | operate | owners | recover*", data1$text) == TRUE, 1, 0))
+
+```
+
+###Saving overall dataset
+
+```{r}
+write.arff(data1, file = "./Data/elected_tweets_dec_04_20.arff")
+
+```
+
+
+###Saving covid tweets as a csv and arff
+
+```{r}
+covid_tweets <- data1 %>% filter(covid_tweet == 1)
+write.csv(covid_tweets, "./Data/covid_tweets.csv")
+write.arff(covid_tweets, file = "./Data/covid_tweets.arff")
+```
+
+
