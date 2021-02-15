@@ -9,7 +9,7 @@ library(stargazer)
 library(sjPlot)
 library(lubridate)
 
-tweet_data <- read.csv("C:/Users/Cole/Documents/Research projects/covid_leaders_gender/Read only (do not track)/tweets_with_covariates_fixed.csv")
+tweet_data <- read.csv("C:/Users/colej/OneDrive/Documents/Research projects/covid_leaders_gender/Read only (do not track)/tweets_with_covariates_fixed.csv")
 
 ##Created at as date
 tweet_data <- tweet_data %>% mutate(created_at = ymd_hms(created_at))
@@ -32,10 +32,19 @@ tweet_data <- tweet_data %>% mutate(surprise.prop = NRC.10.surprise / n.words)
 
 tweet_data <- tweet_data %>% mutate(economy_tweet = ifelse(grepl("business* | jobs | economy | reopen* | opening | relaunch | restart | workforce | economic | easing restrictions | operate | owners | recover*", tweet_data$text) == TRUE, 1, 0))
 
+##Gun tweets (because 'gun violence epidemic' is common phrase)
+
+tweet_data <- tweet_data %>% mutate(gun_tweet = ifelse(grepl("gun", tweet_data$text) == TRUE, 1, 0))
+tweet_data <- tweet_data %>% filter(gun_tweet == 0)
+
+tweet_data <- tweet_data %>% mutate(epidemic_tweet = ifelse(grepl("epidemic", tweet_data$text) == TRUE, 1, 0))
+tweet_data <- tweet_data %>% filter(epidemic_tweet == 0)
+
 ##Cases and deaths per capita
 
-tweet_data <- tweet_data %>% mutate(cases_pc = as.numeric(cases) / as.numeric(pop2019))
-tweet_data <- tweet_data %>% mutate(deaths_pc = as.numeric(deaths) / as.numeric(pop2019))
+tweet_data <- tweet_data %>% mutate(cases_pc = as.numeric(cases) / as.numeric(factor(pop2019)))
+tweet_data <- tweet_data %>% mutate(deaths_pc = as.numeric(deaths) / as.numeric(factor(pop2019)))
+
 
 
 ```
@@ -151,5 +160,26 @@ interactions::interact_plot(model_anger_type, pred = "NRC.10.Expanded.anger", mo
 
 plot_model(model_anger_indfe, type = "pred", terms = c("gender", "NRC.10.Expanded.anger[0.01, 1.36, 13.24]")) #[min, mean, max]
 ```
+
+##Finding representative tweets
+
+###Using residuals
+
+```{r}
+resid_anger <- residuals(model_anger_type)
+data_anger <- model.frame(model_anger_type)
+data_anger <- bind_cols(data_anger, resid_anger)
+data_anger <- data_anger %>% rename(residuals = ...19)
+
+data_anger_sub <- data_anger %>% filter(residuals > -19 & residuals < 180) # Median and 3rd quartile
+qplot(data = data_anger_sub, x = NRC.10.anger, y = residuals)
+
+data_anger_sub <- data_anger_sub %>% filter(NRC.10.anger >= 4)
+
+###Clumsy way of getting the tweet based on features from the model frame
+
+tweet_candidates <- tweet_data %>% filter(favorite_count == 968, NRC.10.anger == 5)
+tweet_candidates$text
 ```
+
 
