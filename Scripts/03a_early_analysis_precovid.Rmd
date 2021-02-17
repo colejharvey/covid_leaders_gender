@@ -1,0 +1,155 @@
+---
+title: "Early analysis: pre-covid"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(stargazer)
+library(sjPlot)
+library(lubridate)
+
+#tweet_data <- read.csv("C:/Users/Cole/Documents/Research projects/covid_leaders_gender/Read only (do not track)/tweets_with_covariates_precovid.csv")
+tweet_data <- read.csv("Data/tweets_with_covariates_precovid.csv")
+
+##Created at as date
+tweet_data <- tweet_data %>% mutate(created_at = ymd_hms(created_at))
+
+##Number of words per string
+tweet_data <- tweet_data %>% mutate(n.words = str_count(text, boundary("word")))
+
+##Emotion words divided by word length
+tweet_data <- tweet_data %>% mutate(anger.prop = NRC.10.anger / n.words)
+tweet_data <- tweet_data %>% mutate(trust.prop = NRC.10.trust / n.words)
+tweet_data <- tweet_data %>% mutate(anticip.prop = NRC.10.anticipation / n.words)
+tweet_data <- tweet_data %>% mutate(disgust.prop = NRC.10.disgust / n.words)
+tweet_data <- tweet_data %>% mutate(fear.prop = NRC.10.fear / n.words)
+tweet_data <- tweet_data %>% mutate(joy.prop = NRC.10.joy / n.words)
+tweet_data <- tweet_data %>% mutate(sad.prop = NRC.10.sadness / n.words)
+tweet_data <- tweet_data %>% mutate(surprise.prop = NRC.10.surprise / n.words)
+
+
+##Economy tweets
+
+tweet_data <- tweet_data %>% mutate(economy_tweet = ifelse(grepl("business* | jobs | economy | reopen* | opening | relaunch | restart | workforce | economic | easing restrictions | operate | owners | recover*", tweet_data$text) == TRUE, 1, 0))
+
+##Fixing gender
+
+tweet_data <- tweet_data %>% mutate(gender = ifelse(gender == "W", "F", gender))
+tweet_data <- tweet_data %>% mutate(gender = ifelse(gender == 1, "F", gender))
+tweet_data <- tweet_data %>% mutate(gender = ifelse(gender == 2, "M", gender))
+
+tweet_data <- tweet_data %>% mutate(gender = as.factor(gender))
+
+```
+
+```{r}
+text.emotions <- tweet_data %>% select(text, NRC.10.anger, NRC.10.trust, gender, screen_name, type)
+```
+
+##Looking at how people respond to anger and trust by gender and party
+
+Note: There are no significant interaction effects for party * gender * emotion for either anger or trust
+
+```{r}
+model_anger_type <- lm(favorite_count ~ gender*NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise + NRC.10.trust + retweet_count + party + followers_count + type + n.words, data = tweet_data %>% filter(party == "Republican" | party == "Democrat"))
+stargazer(model_anger_type, type = "text")
+
+model_anger_indfe <- lm(favorite_count ~ gender*NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise + NRC.10.trust +  retweet_count + party +  as.factor(screen_name_lower) + n.words, data = tweet_data %>% filter(party == "Republican" | party == "Democrat"))
+stargazer(model_anger_indfe, omit = "screen_name", type = "text")
+```
+
+Anger plots
+
+```{r}
+plot_model(model_anger_type, type = "eff", terms = c("gender", "NRC.10.anger[0, .51, 9]")) #[min, mean, max]
+plot_model(model_anger_type, type = "eff", terms = c("NRC.10.anger", "gender")) #[min, mean, max]
+interplot::interplot(model_anger_type, var2 = "gender", var1 = "NRC.10.anger")
+interactions::interact_plot(model_anger_type, pred = "NRC.10.anger", modx = "gender", interval = T)
+
+
+interactions::interact_plot(model_anger_indfe, pred = "NRC.10.anger", modx = "gender", mod2 = "party", interval = T)
+```
+
+
+```{r}
+model_trust_type <- lm(favorite_count ~ gender*NRC.10.trust + NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise + retweet_count + followers_count + party + type, data = tweet_data %>% filter(party == "Republican" | party == "Democrat"))
+stargazer(model_trust_type, type = "text")
+
+model_trust_indfe <- lm(favorite_count ~ gender*NRC.10.trust + NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise  + cases + deaths + cases_pc + deaths_pc + retweet_count + economy_tweet + screen_name_lower, data = tweet_data)
+stargazer(model_trust_indfe, omit = "screen_name", type = "text")
+```
+
+Trust plots
+
+```{r}
+plot_model(model_trust_type, type = "eff", terms = c("gender", "NRC.10.trust[0, 1.24, 9]")) #[min, mean, max]
+plot_model(model_trust_type, type = "eff", terms = c("NRC.10.trust", "gender")) #[min, mean, max]
+
+interactions::interact_plot(model_trust_type, pred = "NRC.10.trust", modx = "gender", interval = T)
+
+
+plot_model(model_trust_indfe, type = "pred", terms = c("gender", "NRC.10.trust[0, 1.24, 9]")) #[min, mean, max]
+```
+
+##Testing male/female use of anger and trust
+
+```{r}
+library(MASS)
+model_anger_dv <- glm.nb(NRC.10.anger ~ gender + followers_count + party + type, data = tweet_data)
+stargazer(model_anger_dv, type = "text")
+
+model_trust_dv <- glm.nb(NRC.10.trust ~ gender + followers_count + party + type, data = tweet_data)
+stargazer(model_trust_dv, type = "text")
+```
+
+
+
+###Using proportions
+
+```{r}
+model_anger_type <- lm(favorite_count ~ gender*anger.prop + anticip.prop + disgust.prop + fear.prop + joy.prop + sad.prop + surprise.prop + trust.prop + cases_pc + deaths_pc +  retweet_count + party + followers_count + type + economy_tweet + n.words, data = tweet_data %>% filter(party == "Republican" | party == "Democrat"))
+stargazer(model_anger_type, type = "text")
+
+
+model_trust_type <- lm(favorite_count ~ gender*trust.prop + anger.prop + anticip.prop + disgust.prop + fear.prop + joy.prop + sad.prop + surprise.prop  + cases_pc + deaths_pc +  retweet_count + party + followers_count + type + economy_tweet + n.words, data = tweet_data %>% filter(party == "Republican" | party == "Democrat"))
+stargazer(model_trust_type, type = "text")
+```
+
+Anger plots
+
+```{r}
+plot_model(model_anger_type, type = "eff", terms = c("gender", "anger.prop[0, 0.29]")) #[min, mean, max]
+plot_model(model_anger_type, type = "eff", terms = c("anger.prop", "gender")) #[min, mean, max]
+
+plot_model(model_trust_type, type = "eff", terms = c("gender", "trust.prop[0, 0.27]")) #[min, mean, max]
+plot_model(model_trust_type, type = "eff", terms = c("trust.prop", "gender")) #[min, mean, max]
+
+```
+
+
+###Using alternative emotion datasets
+
+Hashtag dataset has no effect for anger or trust in interaction with gender
+Same is true for 'expanded' variables
+
+```{r}
+model_anger_type <- lm(favorite_count ~ gender*NRC.10.Expanded.anger + NRC.10.Expanded.anticipation + NRC.10.Expanded.disgust + NRC.10.Expanded.fear + NRC.10.Expanded.joy + NRC.10.Expanded.sadness + NRC.10.Expanded.surprise + NRC.10.Expanded.trust + cases_pc + deaths_pc +  retweet_count + followers_count + party + type + economy_tweet + n.words, data = tweet_data)
+stargazer(model_anger_type, type = "text")
+
+model_anger_indfe <- lm(favorite_count ~ gender*NRC.10.Expanded.anger + NRC.10.Expanded.anticipation + NRC.10.Expanded.disgust + NRC.10.Expanded.fear + NRC.10.Expanded.joy + NRC.10.Expanded.sadness + NRC.10.Expanded.surprise + NRC.10.Expanded.trust +  cases_pc + deaths_pc +  retweet_count + economy_tweet + as.factor(screen_name_lower) + n.words, data = tweet_data)
+stargazer(model_anger_indfe, omit = "screen_name", type = "text")
+```
+
+Anger plots
+
+```{r}
+plot_model(model_anger_type, type = "eff", terms = c("gender", "NRC.10.Expanded.anger[0, 1.36, 13.24]")) #[min, mean, max]
+plot_model(model_anger_type, type = "eff", terms = c("NRC.10.Expanded.trust", "gender")) #[min, mean, max]
+interplot::interplot(model_anger_type, var2 = "gender", var1 = "NRC.10.Expanded.trust")
+interactions::interact_plot(model_anger_type, pred = "NRC.10.Expanded.anger", modx = "gender", interval = T)
+
+plot_model(model_anger_indfe, type = "pred", terms = c("gender", "NRC.10.Expanded.anger[0.01, 1.36, 13.24]")) #[min, mean, max]
+```
+```
+

@@ -1,0 +1,41 @@
+---
+title: "Getting data from Affective tweets"
+output: html_notebook
+---
+
+```{r setup}
+library(RWeka)
+library(tidyverse)
+training_data <- read.arff("affective_tweets_training_data.arff")
+```
+
+
+Interacting negative word count with emotions
+```{r}
+training_data <- training_data %>% mutate(neg_anger = ifelse(`Negation-negationCount` == 0, `NRC-10-anger`, -1*`Negation-negationCount`*`NRC-10-anger`))
+training_data <- training_data %>% mutate(neg_disgust = ifelse(`Negation-negationCount` == 0, `NRC-10-disgust`, -1*`Negation-negationCount`*`NRC-10-disgust`))
+training_data <- training_data %>% mutate(neg_fear = ifelse(`Negation-negationCount` == 0, `NRC-10-fear`, -1*`Negation-negationCount`*`NRC-10-fear`))
+training_data <- training_data %>% mutate(neg_joy = ifelse(`Negation-negationCount` == 0, `NRC-10-joy`, -1*`Negation-negationCount`*`NRC-10-joy`))
+training_data <- training_data %>% mutate(neg_sadness = ifelse(`Negation-negationCount` == 0, `NRC-10-sadness`, -1*`Negation-negationCount`*`NRC-10-sadness`))
+training_data <- training_data %>% mutate(neg_surprise = ifelse(`Negation-negationCount` == 0, `NRC-10-surprise`, -1*`Negation-negationCount`*`NRC-10-surprise`))
+training_data <- training_data %>% mutate(neg_trust = ifelse(`Negation-negationCount` == 0, `NRC-10-trust`, -1*`Negation-negationCount`*`NRC-10-trust`))
+training_data <- training_data %>% mutate(neg_anticipation = ifelse(`Negation-negationCount` == 0, `NRC-10-anticipation`, -1*`Negation-negationCount`*`NRC-10-anticipation`))
+```
+
+Binary classification (No/low emotion vs. medium/high)
+```{r}
+training_data <- training_data %>% mutate(class_anger_binary = as.factor(ifelse(as.numeric(Intensity_Class) <= 2, 0, 1)))
+```
+
+Trinary classification (No, low, medium/high)
+
+```{r}
+training_data <- training_data %>% mutate(class_anger_trinary = as.factor(ifelse(as.numeric(Intensity_Class) == 1, 0, ifelse(Intensity_Class == 2, 1, 2))))
+```
+
+
+Write results
+```{r}
+write.arff(training_data, "affective_tweets_training_data_update.arff")
+```
+
