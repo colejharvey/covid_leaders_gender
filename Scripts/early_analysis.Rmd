@@ -8,6 +8,7 @@ library(tidyverse)
 library(stargazer)
 library(sjPlot)
 library(lubridate)
+library(stringi)
 
 tweet_data <- read.csv("C:/Users/colej/OneDrive/Documents/Research projects/covid_leaders_gender/Read only (do not track)/tweets_with_covariates_fixed.csv")
 
@@ -32,13 +33,18 @@ tweet_data <- tweet_data %>% mutate(surprise.prop = NRC.10.surprise / n.words)
 
 tweet_data <- tweet_data %>% mutate(economy_tweet = ifelse(grepl("business* | jobs | economy | reopen* | opening | relaunch | restart | workforce | economic | easing restrictions | operate | owners | recover*", tweet_data$text) == TRUE, 1, 0))
 
-##Gun tweets (because 'gun violence epidemic' is common phrase)
+##Removing epidemic tweets (because 'gun violence epidemic' is common phrase)
 
-tweet_data <- tweet_data %>% mutate(gun_tweet = ifelse(grepl("gun", tweet_data$text) == TRUE, 1, 0))
-tweet_data <- tweet_data %>% filter(gun_tweet == 0)
+tweet_data <- tweet_data %>% mutate(text.lower = tolower(text))
 
-tweet_data <- tweet_data %>% mutate(epidemic_tweet = ifelse(grepl("epidemic", tweet_data$text) == TRUE, 1, 0))
+
+#tweet_data <- tweet_data %>% mutate(gun_tweet = ifelse(grepl("gun", tweet_data$text) == TRUE, 1, 0))
+#tweet_data <- tweet_data %>% filter(gun_tweet == 0)
+
+tweet_data <- tweet_data %>% mutate(epidemic_tweet = ifelse(grepl("epidemic", tweet_data$text.lower) == TRUE, 1, 0))
 tweet_data <- tweet_data %>% filter(epidemic_tweet == 0)
+
+tweet_data <- tweet_data %>% select(-text.lower)
 
 ##Cases and deaths per capita
 
@@ -182,4 +188,23 @@ tweet_candidates <- tweet_data %>% filter(favorite_count == 968, NRC.10.anger ==
 tweet_candidates$text
 ```
 
+##Angriest texts
+
+```{r}
+#tweets_subset <- tweet_data %>% filter(NRC.10.anger >= 4)
+#tweets_subset <- tweets_subset %>% arrange(NRC.10.anger)
+cat(paste0("- `", tweets_subset$text, "`"), sep = "\n")
+```
+###Using other anger measures
+
+```{r}
+tweet_data <- tweet_data %>% arrange(desc(NRC.Hash.Emo.anger))
+
+tweets_subset <- tweet_data$text[1:50]
+
+tweets_subset=gsub(">","", gsub("<U\\+","\\\\u",tweets_subset))  #Trying to get things into readable format (removes <> and replaces upper case U with u)
+stri_unescape_unicode(tweets_subset)
+cat(paste0("- `", as.character(tweets_subset), "`"), sep = "\n")
+
+```
 
