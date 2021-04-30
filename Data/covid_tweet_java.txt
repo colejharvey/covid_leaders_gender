@@ -1,0 +1,77 @@
+Qualtrics.SurveyEngine.addOnload(function(){
+
+	// Set number of choices;
+	var numChoice = 8;
+
+	// Vectors containing all attribute levels :
+	var partyArray = ["Republican", "Democrat", "Independent"];
+	var genderArray = ["Male", "Female"];
+	var raceArray = ["Caucasian", "African American", "Hispanic", "Asian"];
+	var eduArray = ["High School", "College", "Professional degree"];
+	var expArray = ["0 years", "5 years ", "10 years ", "15 years ", " None"];
+	var tweetArray = ["https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_diHzO7I2MIt97sq", 
+					  "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_8wiwBDHBY8V8JiC", 
+					  "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_5jnTPuR38LVuBhk", 
+					  "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_ctHPFpsMvUTgaxM", 
+					   "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_dgyeC4326KqAVVk", 
+					  "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_9uhLsjOQ85WRH8i", 
+					  "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_57tznVopQsCxdD8",
+					 "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_bm844JAdvmW3jUy",
+					 "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_cvUYZrNjtZckOgu",
+					 "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_bayn7QBT03siLVI",
+					 "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_eJsrkZLMMD6Dbr8",
+					 "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_57j1pBuO50vrdae",
+					 "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_6tmPEw4Z4BL9Mfs",
+					 "https://eui.eu.qualtrics.com/ControlPanel/Graphic.php?IM=IM_09hZGKO1tId2GKW"];
+
+
+	// Fisher - Yates shuffle :
+	function shuffle(array){
+		for (var i = array.length - 1; i > 0; i--){
+			var j = Math.floor(Math.random() * (i + 1));
+			var temp = array[i];
+			array[i] = array[j];
+			array[j] = temp;
+		}
+		return array;
+	}
+	
+
+	// Shuffle a vector , choose the first entry :
+	function shuffle_one(theArray){
+		var out = shuffle(theArray);
+		var out = out[0];
+		return(out)
+	};
+	
+
+	// Perform the randomization and save the result :
+	for (i = 1; i <= numChoice; i++) {
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_party1", shuffle_one(partyArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_party2", shuffle_one(partyArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_gender1", shuffle_one(genderArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_gender2", shuffle_one(genderArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_race1", shuffle_one(raceArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_race2", shuffle_one(raceArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_exp1", shuffle_one(expArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_exp2", shuffle_one(expArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_edu1", shuffle_one(eduArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_edu2", shuffle_one(eduArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_tweet1", shuffle_one(tweetArray));
+		Qualtrics.SurveyEngine.setEmbeddedData("choice"+i+"_tweet2", shuffle_one(tweetArray));
+	}
+});
+
+
+
+Qualtrics.SurveyEngine.addOnReady(function()
+{
+	/*Place your JavaScript here to run when the page is fully displayed*/
+
+});
+
+Qualtrics.SurveyEngine.addOnUnload(function()
+{
+	/*Place your JavaScript here to run when the page is unloaded*/
+
+});
