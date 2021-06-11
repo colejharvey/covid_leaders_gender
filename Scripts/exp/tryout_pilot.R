@@ -13,7 +13,6 @@ data <- full_join(covid_arm, immi_arm)
 rm(covid_arm, immi_arm)
 
 
-
 #### try to change wide to long for cjoint ####
 
 ### WORKS
