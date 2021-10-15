@@ -6,8 +6,8 @@
 library(tidyverse)
 
 
-covid_arm <- read.csv("Data/pilot/covid_arm.csv")
-immi_arm <- read.csv("Data/pilot/immi_arm.csv")
+covid_arm <- read.csv("survey/pilot/covid_arm.csv")
+immi_arm <- read.csv("survey/pilot/immi_arm.csv")
 
 data <- full_join(covid_arm, immi_arm)
 rm(covid_arm, immi_arm)
