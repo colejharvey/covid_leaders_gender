@@ -57,14 +57,12 @@ windowsFonts(Georgia = windowsFont("Georgia")) #load fonts for windows machines
 ## Set ggplot theme with the Georgia font
 theme_set(theme_light(base_family = "Georgia"))
 
-
-
 ```
 
 ## Main results
-I have cleaned the data from the surveys. There are now two data files: the conjoint data and the normal survey data. These are different files because in the conjoint data a row is a profile in the conjoint and not a respondent. Generally we will only work with the conjoint data.
+I have cleaned the data from the surveys. There are now two data files on the github: the conjoint data and the normal survey data. These are different files because in the conjoint data a row is a candidate profile in the conjoint and not a respondent. Generally, we will only work with the conjoint data.
 
-The first model reported focuses on the different conjoint attributes without looking at any interactions. The plots included are not the final ones, they're just there to present the results so that we can discuss them. For the Tweets, I used the trust variable (recall that we had every Tweet coded by respondents in a classifying survey). 
+The first model reported below in the forest plot focuses on the different conjoint attributes without looking at any interactions. All the plots below are very ugly, they're just there to present the results so that we can discuss them. The baselines are no education, caucasian, low for the emotions variables, Democrats, and female. 
 
 ```{r main model, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
 x <- lm_robust(chosen ~ edu + exp + party + #use robust to cluster
@@ -79,7 +77,7 @@ plot_model(x, SE=T, show.values = TRUE,
 
 ```
 
-We thus find that the emotionality of a Tweet has the strongest influence on whether people like a candidate. In addition, respondents seem to slightly prefer female candidates and Democratic candidates. Education and experience in office both have a positive impact on candidate evaluation. Race is not significant.
+We thus find that the emotionality of a Tweet has the strongest influence on whether people like a candidate. In addition, respondents seem to slightly prefer female candidates and Democratic candidates. More education and experience in office both have a positive impact on candidate choice. Race is not significant.
 
 To now test our hypotheses, we look at the interactions between the policy domain and gender as well as emotions and gender. 
 
@@ -97,6 +95,28 @@ plot_model(x, SE=T, show.values = TRUE,
 
 ```
 Whilst respondents seem to slightly prefer male candidates on immigration, as we would predict, this effect is not significant. We thus reject: **H1a:**  *Female candidates will receive more support in the context of the covid-19 pandemic than in non-healthcare contexts and male candidates will receivemore support in the context of immigration*
+
+
+We can also look at the variables that we added for the mechanisms. Perhaps respondent's do not like a candidate less but evaluate her as less competent. For instance, let's look at whether respondents think a candidate can get things done in office. 
+
+```{r echo=TRUE}
+x <- lm_robust(thingsdone_chosen ~ edu + exp + party + #we thus use a different outcome
+                    race + trust_cut + gender * arm, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Policy Domain and Gender: getting things done")
+
+
+
+```
+We find that people generally think that women get things done more than men, but this effect is somewhat smaller on immigration. Although the interaction term is not significant. These results are the same for the other outcomes (how committed you are and if you perform under pressure). 
+
+
+
 
 
 What happens if we look at partisanship:
@@ -165,10 +185,10 @@ plot_model(x, SE=T, show.values = TRUE,
 
 ```
 
-We see that Trust is always rewarded. Anger is rewarded if candidates are not too angry. There is no relationship between emotions and gender on either Anger or Trust.   We thus reject: **H4:** *Female politicians will receive less support when they  use high-anger tweets, compared to high-trust or low-emotion language*. This effect does not depend on the party. We thus also reject  **H5:**  *The effect of high  anger on  support for female  candidates  will  vary  for Republican and Democratic candidates.* In addition, the effect of gender does not depend on the policy domain. We thus also reject **H6:** *Gender-based penalties for anger will be lower in the context of the covid-19 pandemic than in non-healthcare contexts.*
+We see that more Trust is always rewarded. Anger is rewarded if candidates are not too angry yet punished at very high levels of anger. There is no relationship between emotions and gender on either Anger or Trust.   We thus reject: **H4:** *Female politicians will receive less support when they  use high-anger tweets, compared to high-trust or low-emotion language*. This effect does not depend on the party. We thus also reject  **H5:**  *The effect of high  anger on  support for female  candidates  will  vary  for Republican and Democratic candidates.* In addition, the effect of gender does not depend on the policy domain. We thus also reject **H6:** *Gender-based penalties for anger will be lower in the context of the covid-19 pandemic than in non-healthcare contexts.*
 
 
-That leaves the hypotheses that interact with characteristics of the respondent (i.e. her partisanship and gender). Let's look at those next. First the two hypotheses on anger being more appreciated if it comes from co-partisans. **H2:** *Tweets that are  high in anger will result in more support  from  co-partisans* and **H3:**  *Tweets that are high in anger will result in less support from out-group partisans.* We find support for these hypothesis: co-partisanship influences whether respondents appreciate anger or not. 
+That leaves the hypotheses that interact with characteristics of the respondent (i.e. her partisanship and gender). Let's look at those next. First the two hypotheses on anger being more appreciated if it comes from co-partisans. **H2:** *Tweets that are  high in anger will result in more support  from  co-partisans* and **H3:**  *Tweets that are high in anger will result in less support from out-group partisans.* We find support for these hypothesis: co-partisanship influences whether respondents appreciate anger or not:
 
 
 
@@ -270,11 +290,10 @@ Why we might not have found effects for the policy domain and gender:
 
 * The gender might not have been strong enough. Perhaps we should have used a picture instead of just the label male or female.
 * The policy domain might not have been strong enough. Perhaps immigration is not that clearly a masculine issue and covid not very clearly a feminine issue. E.g. Covid was also about China and immigration is also about 'dreamers'. In addition, we could have directly asked respondents to consider a candidate for a 'president who mainly has to deal with X'. Where X is the policy domain.  
-* Or we're just simply wrong and policy domain does not influence whether people prefer men or women. 
+* Or we're just simply wrong and policy domain does not influence whether people prefer men or women. I think this is less likely, however, as the signs are in the expected direction. 
 
 
 What we do find:
-
 * Emotions have a strong influence on what people think of candidates. This effect is causal. 
 * Co-partisanship influences what people think of emotions (H4).
 
