@@ -39,6 +39,8 @@ library(interplot)
 library(sjPlot)
 library(viridis)
 library(estimatr)
+library(ggeffects)
+library(cregg)
 
 
 
@@ -92,6 +94,14 @@ plot_model(x, SE=T, show.values = TRUE,
            digits = 3) +
    ylim(-.15, .15) + 
   theme_minimal() + ggtitle("Policy Domain and Gender")
+
+
+f <- chosen ~ edu + exp + party + race + trust_cut + gender + arm
+x <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm", by = ~arm)# for the left-right bins
+
+
+
+
 
 ```
 Whilst respondents seem to slightly prefer male candidates on immigration, as we would predict, this effect is not significant. We thus reject: **H1a:**  *Female candidates will receive more support in the context of the covid-19 pandemic than in non-healthcare contexts and male candidates will receivemore support in the context of immigration*

@@ -1,0 +1,505 @@
+---
+title: First results Pol Pan
+author: "Jonne Kamphorst"
+date : 30/10/2021
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    fig_caption: TRUE
+    toc : TRUE
+    toc_depth: 2
+    number_sections: true
+  pdf_document: default
+  word_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r, echo=FALSE}
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(ggplot2))
+```
+
+
+
+
+```{r load data, include=FALSE}
+######
+######## Doing some preliminary analysis for the survey
+########
+######## Jonne Kamphorst
+######## 29/10/2021
+
+
+
+library(qualtRics)
+library(dplyr)
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(extrafont)
+library(interplot)
+library(sjPlot)
+library(viridis)
+library(estimatr)
+library(ggeffects)
+library(cregg)
+
+
+
+
+## Load data
+#conjoint_data <- readRDS("survey/data/conjoint_data.rds")
+conjoint_data <- readRDS("C:/github projects/polpan/covid_leaders_gender/survey/data/conjoint_data.rds")
+
+
+
+#font_import()
+loadfonts(quiet = T, device = "pdf")
+windowsFonts(Georgia = windowsFont("Georgia")) #load fonts for windows machines
+
+
+## Set ggplot theme with the Georgia font
+theme_set(theme_light(base_family = "Georgia"))
+
+
+
+
+# add a variable for someone's partisanship
+conjoint_data$res_par <- NA
+conjoint_data$res_par <- conjoint_data$Q2.3 #partisan identity
+conjoint_data$res_par <- ifelse(conjoint_data$res_par == "Independent" & #for independents add based on 'leaning dem or rep' 
+                                  conjoint_data$Q2.4 == "Democrats", "Democrat",
+                                ifelse(conjoint_data$res_par == "Independent" & 
+                                  conjoint_data$Q2.4 == "Republicans", "Republican", 
+                                  conjoint_data$res_par))  
+  
+# add a variable in the conjoint profile for if a respondent and candidate
+#    are co partisans
+conjoint_data$co_partisan <- NA
+conjoint_data$co_partisan <- ifelse(conjoint_data$party == "Democrat" &
+                                      conjoint_data$res_par == "Democrat" | 
+                                      conjoint_data$party == "Republican" &
+                                      conjoint_data$res_par == "Republican", "Co-partisan cand",
+                                    ifelse(conjoint_data$party == "Democrat" &
+                                      conjoint_data$res_par == "Republican" | 
+                                      conjoint_data$party == "Republican" &
+                                      conjoint_data$res_par == "Democrat", "Out-partisan cand",
+                                      "Indepentent cand"))
+
+conjoint_data$Partisan <- factor(conjoint_data$co_partisan, 
+                                    levels=c("Out-partisan cand", "Co-partisan cand", "Indepentent cand"))
+
+
+## Add respondent's gender
+conjoint_data$gender_res <- NA
+conjoint_data$gender_res <- ifelse(conjoint_data$Q2.7=="Female", "Female",
+                                   ifelse(conjoint_data$Q2.7=="Male", "Male", NA))
+conjoint_data$gender_res <- as.factor(conjoint_data$gender_res)
+
+# the right hand side should be factors. left hand side numeric
+conjoint_data$Arm <- as.factor(conjoint_data$arm)
+conjoint_data$Education <- factor(conjoint_data$edu)
+conjoint_data$Experience <- factor(conjoint_data$exp)
+conjoint_data$Party <- factor(conjoint_data$party)
+conjoint_data$Race <- factor(conjoint_data$race)
+conjoint_data$Trust <- factor(conjoint_data$trust_cut)
+conjoint_data$Anger <- factor(conjoint_data$anger_cut)
+conjoint_data$Gender <- factor(conjoint_data$gender)
+```
+
+
+
+# Just the basic conjoint
+I have cleaned the data from the surveys. There are now two data files on the github: the conjoint data and the normal survey data. These are different files because in the conjoint data a row is a candidate profile in the conjoint and not a respondent. Generally we will only work with the conjoint data.
+
+We first show the results of a general model not looking at any interactions.
+```{r main model, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+### General model no interactions
+f <- chosen ~ Education + Experience + Partisan + Race + Gender + Trust
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm")# for the left-right bins
+
+plot(marginalmeans) + 
+  labs(x="Marginal Means for the probability to choose a profile")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+
+We thus find that partisanship and the emotionality of a Tweet have the strongest influence on whether people like a candidate. In addition, respondents seem to slightly prefer female candidates. More education and experience in office both have a positive impact on candidate choice.
+
+
+
+
+\newpage
+# H1
+## H1a.  *Female candidates will receive more support in the context of the covid19 pandemic than in non-healthcare contexts and male candidates will receive more support in the context of immigration.*
+To test **H1a** hypotheses, we look at the interactions between the policy domain and gender as well as emotions and gender. 
+
+
+```{r echo=TRUE}
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce", by = ~Arm)# for the left-right bins
+marginalmeans$group <- marginalmeans$BY #add a grouping variable for the plot function
+
+plot(marginalmeans) + 
+  labs(x="AMCE on the probability to choose a profile")  + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+
+Respondents seem to slightly prefer female candidates on Covid, as we would predict, whereas for Covid19 there is no difference in gender. We may thus accept: **H1a:**  *Female candidates will receive more support in the context of the covid-19 pandemic than in non-healthcare contexts and male candidates will receive more support in the context of immigration*
+
+
+However, looking at the *differences* directly, the difference is *not* significant (although in the expected direction). I'm not sure this means we can reject the hypothesis or not. 
+
+```{r echo=TRUE}
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by = ~Arm)# for the left-right bins
+marginalmeans$group <- marginalmeans$BY #add a grouping variable for the plot function
+
+plot(marginalmeans) + 
+  labs(x="Differences in the AMCE on the probability to choose a profile by arm")  + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+
+
+
+
+
+## H1b. *Female Democratic candidates will receive more support in the context of the covid-19 pandemic than in non-healthcare contexts, compared to female Republican candidates.*
+
+To look at the effects of partisanship by policy domain we need to see whether the effect of gender is different depending on the party and the policy domain. This is a bit tricky in the cregg package, so I'll just make the interaction between domain and party ID manually first (the package actually has a function for this, should be just as easy to do manually). This won't 100% do it because ideally we have a tripple interation, but it will allow us to eyeball what is going on. 
+```{r echo=TRUE}
+## Create a variable that combines the arm and the gender of a respondent
+conjoint_data$arm_party <- NA
+conjoint_data$arm_party <- interaction(conjoint_data$Arm, conjoint_data$Party, sep = "_")
+conjoint_data$arm_party <- as.character(conjoint_data$arm_party)
+
+# make names smaller for plotting
+conjoint_data$arm_party[conjoint_data$arm_party=="immi_Republican"] <- "Immi R"
+conjoint_data$arm_party[conjoint_data$arm_party=="immi_Independent "] <- "Immi I"
+conjoint_data$arm_party[conjoint_data$arm_party=="immi_Independent"] <- "Immi I"
+conjoint_data$arm_party[conjoint_data$arm_party=="immi_Democrat"] <- "Immi D"
+conjoint_data$arm_party[conjoint_data$arm_party=="covid_Democrat"] <- "Cov D"
+conjoint_data$arm_party[conjoint_data$arm_party=="covid_Independent"] <- "Cov I"
+conjoint_data$arm_party[conjoint_data$arm_party=="covid_Republican"] <- "Cov R"
+conjoint_data$arm_party <- as.factor(conjoint_data$arm_party)
+
+f <- chosen ~ Education + Experience + Gender + Race + Trust
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by = ~arm_party)# for the left-right bins
+marginalmeans$group <- marginalmeans$BY #add a grouping variable for the plot function
+
+
+plot(marginalmeans) + 
+  labs(x="Differences in AMCE by candidate ID and Policy domain")  + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+The differences are not significantly different from zero.
+
+
+
+\newpage
+# H2 & 3. *Tweets that are high in anger will result in more (less) support from copartisans (outpartisans)*
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Add factor for the anger variable
+conjoint_data$Anger <- factor(conjoint_data$anger_cut)
+
+
+
+# The model
+f <- chosen ~ Education + Experience + Race + Gender + Anger
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by=~Partisan)# for the left-right bins
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the AMCE to choose a profile")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+It seems like, but we're finding that copartians and independent candidates are punished *more* for using tweets high in anger than out partisan candidates. Let's look at trust next.
+
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# The model
+f <- chosen ~ Education + Experience + Race + Party + Gender + Trust
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by=~Partisan)# for the left-right bins
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the AMCE to choose a profile")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey()  +
+  theme(legend.position = "none")
+
+```
+Trust, by contrast, is *more* rewarded for co-partisans and independent. Perhaps this means that people don't expect anger from candidates they feel they like whilst it only confirms their priors for out-party candidates. We thus find something but in the opposite direction than we would expect. 
+
+
+
+
+
+
+## H3a *Women respondents will penalize women candidates from the out-party more than out-party male candidates*
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+## Subset sample to women only (not most efficient estimator but clear)
+conjoint_data_sub <- subset(conjoint_data, gender_res == "Female")
+
+# Get the results by copartisan and out partisan
+f <- chosen ~ Education + Experience + Gender + Race
+
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce_differences", by = ~Partisan)# for the left-right bins
+marginalmeans$group <- marginalmeans$BY #add a grouping variable for the plot function
+
+plot(marginalmeans) + 
+  labs(x="Differences in the AMCE to choose a profile, for women only")  + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+The effect of gender does not differ significantly by partisan ID. It seems like for co-partisan candidates man are preferred slightly less, but the differences do not seem significant. 
+
+
+
+## H3b. *Women respondents will penalize out-party women candidates more than out-party male leaders, particularly in the Covid condition, given its gender salience as a policy issue.* 
+Another hard interaction term (please double check what I'm doing), I start with simply sub-setting the sample to female respondents only. 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+## Subset sample to women only (not most efficient estimator but clearer plot and not biased)
+conjoint_data_sub <- subset(conjoint_data, gender_res == "Female" & arm=="covid")
+
+# Get the results by copartisan and out partisan
+f <- chosen ~ Education + Experience + Gender + Race
+
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce_differences", by = ~Partisan)# for the left-right bins
+marginalmeans$group <- marginalmeans$BY #add a grouping variable for the plot function
+
+plot(marginalmeans) + 
+  labs(x="Differences in the AMCE to choose a profile, for female respondents only: Covid arm")  + 
+  ggplot2::facet_wrap(~BY, ncol = 4L) +
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+In the covid arm, there are no significant differences between genders based on partisan identity. That said, the sign of the coefficient indicates that men are preferred slightly more if they're copartisan or independent. 
+
+
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+## Subset sample to women only (not most efficient estimator but clearer plot and not biased)
+conjoint_data_sub <- subset(conjoint_data, gender_res == "Female" & arm=="immi")
+
+# Get the results by copartisan and out partisan
+f <- chosen ~ Education + Experience + Gender + Race
+
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce_differences", by = ~Partisan)# for the left-right bins
+marginalmeans$group <- marginalmeans$BY #add a grouping variable for the plot function
+
+plot(marginalmeans) + 
+  labs(x="Differences in the AMCE to choose a profile, for female respondents only: Immigration arm")  + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+Once again, the differences between partisans are not significant (thus neither in the immigration arm nor in the covid arm). However, now copartisan and independent men are penalized slightly more than outpartisan men. 
+
+
+
+
+\newpage
+# H4. *Female politicians will receive less support when they use high-anger tweets, compared to high-trust or low-emotion language*
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# The model
+f <- chosen ~ Education + Experience + Race + Partisan + Gender + Trust
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm_differences", by=~gender_res)# for the left-right bins
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the MM to choose a profile: for trust")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+
+
+# The model
+f <- chosen ~ Education + Experience + Race + Partisan + Gender + Anger
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm_differences", by=~gender_res)# for the left-right bins
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the MM to choose a profile: for anger")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+The effect of anger and trust are not different when comparing male and female politicians. 
+
+
+
+
+
+
+\newpage
+# H5. The effect of high anger on support for female candidates will vary for Republican and Democratic candidates.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# The model
+f <- chosen ~ Education + Experience + Race  + Anger
+
+# Only look at female candidates
+conjoint_data_sub <- subset(conjoint_data, Gender=="Female")
+
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce_differences", by=~Party)# for the left-right bins
+
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the AMCE to choose a profile: the effect of anger for female candidates only")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + 
+  geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+
+
+# The model
+f <- chosen ~ Education + Experience + Race  + Trust
+
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, 
+                    estimate = "amce_differences", by=~Party)# for the left-right bins
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the AMCE to choose a profile: the effect of trust for female candidates only")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + 
+  geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+Only looking at profile comparisons with female candidates, there does not seem to be a difference in the AMCE of anger or trust when comparing independent, democratic, and republican candidates. 
+
+
+\newpage
+# H6. Gender-based penalties for anger will be lower in the context of the covid-19 pandemic than in non-healthcare contexts.
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# The model
+f <- chosen ~ Education + Experience + Race + Partisan + Anger
+
+# Only look at candidates in the immigration arm
+conjoint_data_sub <- subset(conjoint_data, arm=="immi")
+
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by=~Gender)# for the left-right bins
+marginalmeans$BY_2 <- "Immigration"
+marginalmeans$BY <- paste(marginalmeans$BY, marginalmeans$BY_2)
+
+
+# Only look at candidates in the covid arm
+conjoint_data_sub <- subset(conjoint_data, arm=="covid")
+
+marginalmeans_cov <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by=~Gender)# for the left-right bins
+marginalmeans_cov$BY_2 <- "Covid"
+marginalmeans_cov$BY <- paste(marginalmeans_cov$BY, marginalmeans_cov$BY_2)
+
+marginalmeans <- rbind(marginalmeans, marginalmeans_cov)
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the AMCE to choose a profile: the effect of anger for female candidates only")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + 
+  geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+
+
+# The model
+f <- chosen ~ Education + Experience + Race  + Trust
+
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, 
+                    estimate = "amce_differences", by=~Party)# for the left-right bins
+
+plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="Differences in the AMCE to choose a profile: the effect of trust for female candidates only")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + 
+  geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
+There are no differences between male and female candidates on emotions, nor does this change depending on the policy domain. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
