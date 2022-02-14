@@ -56,7 +56,7 @@ library(cregg)
 
 ## Load data
 #conjoint_data <- readRDS("survey/data/conjoint_data.rds")
-conjoint_data <- readRDS("C:/github projects/polpan/covid_leaders_gender/survey/data/conjoint_data.rds")
+conjoint_data <- readRDS(here::here("survey", "data", "conjoint_data.rds"))
 
 
 
@@ -139,6 +139,22 @@ plot(marginalmeans) +
 We thus find that partisanship and the emotionality of a Tweet have the strongest influence on whether people like a candidate. In addition, respondents seem to slightly prefer female candidates. More education and experience in office both have a positive impact on candidate choice.
 
 
+
+```{r main model anger, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+### General model no interactions
+f.anger <- chosen ~ Education + Experience + Partisan + Race + Gender + Anger
+
+marginalmeans.anger <- cj(conjoint_data, f.anger, id = ~ResponseId, estimate = "mm")# for the left-right bins
+
+plot(marginalmeans.anger) + 
+  labs(x="Marginal Means for the probability to choose a profile")  + 
+  geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
+  geom_vline(xintercept = 0.5, linetype="dashed") +
+  theme_set(theme_light(base_family = "Georgia")) +
+  scale_color_grey() +
+  theme(legend.position = "none")
+
+```
 
 
 \newpage
@@ -356,9 +372,9 @@ Once again, the differences between partisans are not significant (thus neither 
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
 # The model
-f <- chosen ~ Education + Experience + Race + Partisan + Gender + Trust
+f <- chosen ~ Education + Experience + Race + Partisan +  Trust
 
-marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm_differences", by=~gender_res)# for the left-right bins
+marginalmeans <- cj(conjoint_data , f, id = ~ResponseId, estimate = "mm_differences", by=~Gender)
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
   labs(x="Differences in the MM to choose a profile: for trust")  + 
@@ -371,9 +387,9 @@ plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
 
 
 # The model
-f <- chosen ~ Education + Experience + Race + Partisan + Gender + Anger
+f <- chosen ~ Education + Experience + Race + Partisan +  Anger
 
-marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm_differences", by=~gender_res)# for the left-right bins
+marginalmeans <- cj(conjoint_data , f, id = ~ResponseId, estimate = "mm_differences", by=~Gender)
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
   labs(x="Differences in the MM to choose a profile: for anger")  + 
