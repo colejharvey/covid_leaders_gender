@@ -1,0 +1,324 @@
+---
+title: First results Pol Pan
+author: "Jonne Kamphorst"
+date : 30/10/2021
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    fig_caption: TRUE
+    toc : TRUE
+    toc_depth: 2
+    number_sections: true
+  pdf_document: default
+  word_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load data, include=FALSE}
+######
+######## Doing some preliminary analysis for the survey
+########
+######## Jonne Kamphorst
+######## 29/10/2021
+
+
+
+library(qualtRics)
+library(dplyr)
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(extrafont)
+library(interplot)
+library(sjPlot)
+library(viridis)
+library(estimatr)
+library(ggeffects)
+library(cregg)
+
+
+
+
+## Load data
+#conjoint_data <- readRDS("survey/data/conjoint_data.rds")
+conjoint_data <- readRDS("C:/github projects/polpan/covid_leaders_gender/survey/data/conjoint_data.rds")
+
+
+
+#font_import()
+loadfonts(quiet = T, device = "pdf")
+windowsFonts(Georgia = windowsFont("Georgia")) #load fonts for windows machines
+
+
+## Set ggplot theme with the Georgia font
+theme_set(theme_light(base_family = "Georgia"))
+
+```
+
+## Main results
+I have cleaned the data from the surveys. There are now two data files on the github: the conjoint data and the normal survey data. These are different files because in the conjoint data a row is a candidate profile in the conjoint and not a respondent. Generally, we will only work with the conjoint data.
+
+The first model reported below in the forest plot focuses on the different conjoint attributes without looking at any interactions. All the plots below are very ugly, they're just there to present the results so that we can discuss them. The baselines are no education, caucasian, low for the emotions variables, Democrats, and female. 
+
+```{r main model, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+x <- lm_robust(chosen ~ edu + exp + party + #use robust to cluster
+                    race + trust_cut + gender, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Basic Model")
+
+```
+
+We thus find that the emotionality of a Tweet has the strongest influence on whether people like a candidate. In addition, respondents seem to slightly prefer female candidates and Democratic candidates. More education and experience in office both have a positive impact on candidate choice. Race is not significant.
+
+To now test our hypotheses, we look at the interactions between the policy domain and gender as well as emotions and gender. 
+
+
+```{r echo=TRUE}
+x <- lm_robust(chosen ~ edu + exp + party + #use robust to cluster
+                    race + trust_cut + gender * arm, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Policy Domain and Gender")
+
+
+f <- chosen ~ edu + exp + party + race + trust_cut + gender + arm
+x <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm", by = ~arm)# for the left-right bins
+
+
+
+
+
+```
+Whilst respondents seem to slightly prefer male candidates on immigration, as we would predict, this effect is not significant. We thus reject: **H1a:**  *Female candidates will receive more support in the context of the covid-19 pandemic than in non-healthcare contexts and male candidates will receivemore support in the context of immigration*
+
+
+We can also look at the variables that we added for the mechanisms. Perhaps respondent's do not like a candidate less but evaluate her as less competent. For instance, let's look at whether respondents think a candidate can get things done in office. 
+
+```{r echo=TRUE}
+x <- lm_robust(thingsdone_chosen ~ edu + exp + party + #we thus use a different outcome
+                    race + trust_cut + gender * arm, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Policy Domain and Gender: getting things done")
+
+
+
+```
+We find that people generally think that women get things done more than men, but this effect is somewhat smaller on immigration. Although the interaction term is not significant. These results are the same for the other outcomes (how committed you are and if you perform under pressure). 
+
+
+
+
+
+What happens if we look at partisanship:
+```{r echo=TRUE}
+x <- lm_robust(chosen ~ edu + exp  + #use robust to cluster
+                    race + anger_cut + gender * arm * party, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Interaction between gender, policy domain, and partisanship")
+
+```
+There are also no interaction effects between the policy domain and a candidate's party. We thus reject: **H1b:**  *Female Democratic candidates will receive more support in the contextof the covid-19 pandemic than in non-healthcare contexts, compared to female Republican candidates.*
+
+
+
+
+Now for the effects of emotions: 
+
+
+```{r echo=TRUE}
+x <- lm_robust(chosen ~ edu + exp + party + #use robust to cluster
+                    race + trust_cut * gender, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Emotions and Gender: trust")
+
+x <- lm_robust(chosen ~ edu + exp + party + #use robust to cluster
+                    race + anger_cut * gender, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Emotions and Gender: anger")
+
+x <- lm_robust(chosen ~ edu + exp  + #use robust to cluster
+                    race + anger_cut * gender * party, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Emotions and Gender: tripple interaction with the party of the candidate")
+
+
+x <- lm_robust(chosen ~ edu + exp  + party + #use robust to cluster
+                    race + anger_cut * gender * arm, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + ggtitle("Emotions and Gender: gender based penalties for anger depending on the policy domain")
+
+
+```
+
+We see that more Trust is always rewarded. Anger is rewarded if candidates are not too angry yet punished at very high levels of anger. There is no relationship between emotions and gender on either Anger or Trust.   We thus reject: **H4:** *Female politicians will receive less support when they  use high-anger tweets, compared to high-trust or low-emotion language*. This effect does not depend on the party. We thus also reject  **H5:**  *The effect of high  anger on  support for female  candidates  will  vary  for Republican and Democratic candidates.* In addition, the effect of gender does not depend on the policy domain. We thus also reject **H6:** *Gender-based penalties for anger will be lower in the context of the covid-19 pandemic than in non-healthcare contexts.*
+
+
+That leaves the hypotheses that interact with characteristics of the respondent (i.e. her partisanship and gender). Let's look at those next. First the two hypotheses on anger being more appreciated if it comes from co-partisans. **H2:** *Tweets that are  high in anger will result in more support  from  co-partisans* and **H3:**  *Tweets that are high in anger will result in less support from out-group partisans.* We find support for these hypothesis: co-partisanship influences whether respondents appreciate anger or not:
+
+
+
+```{r echo=TRUE}
+# add a variable for someone's partisanship
+conjoint_data$res_par <- NA
+conjoint_data$res_par <- conjoint_data$Q2.3
+  
+conjoint_data$res_par <- ifelse(conjoint_data$res_par == "Independent" & 
+                                  conjoint_data$Q2.4 == "Democrats", "Democrat",
+                                ifelse(conjoint_data$res_par == "Independent" & 
+                                  conjoint_data$Q2.4 == "Republicans", "Republican", 
+                                  conjoint_data$res_par))  
+  
+# add a variable in the conjoint profile for if a respondent and candidate
+#    are co partisans
+conjoint_data$co_partisan <- NA
+conjoint_data$co_partisan <- ifelse(conjoint_data$party == "Democrat" &
+                                      conjoint_data$res_par == "Democrat" | 
+                                      conjoint_data$party == "Republican" &
+                                      conjoint_data$res_par == "Republican", "Co-partisan",
+                                    ifelse(conjoint_data$party == "Democrat" &
+                                      conjoint_data$res_par == "Republican" | 
+                                      conjoint_data$party == "Republican" &
+                                      conjoint_data$res_par == "Democrat", "Other-partisan",
+                                      "Indepentent"))
+
+conjoint_data$co_partisan <- factor(conjoint_data$co_partisan, 
+                                    levels=c("Indepentent", "Co-partisan", "Other-partisan"))
+
+
+# clean the gender variable
+conjoint_data$gender_res <- NA
+conjoint_data$gender_res <- ifelse(conjoint_data$Q2.7 == "Male", "Male",
+                                   ifelse(conjoint_data$Q2.7 == "Female", "Female", NA))
+
+
+x <- lm_robust(chosen ~ edu + exp  + gender + #use robust to cluster
+                    race + anger_cut * co_partisan, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + 
+  ggtitle("Emotions and co-partisanship")
+```
+
+
+Then the hypotheses on the gender of a respondent, **H3a:**  Women respondents will penalize women candidates from the out-party more than out-party male candidates and **H3b:** Women  respondents will penalize out-party women candidates more than  out-party male leaders, particularly in the Covid condition, given its gender salience as a policy issue. We find no support for these hypotheses. 
+
+```{r}
+x <- lm_robust(chosen ~ edu + exp   + #use robust to cluster
+                    race + anger_cut + co_partisan * gender * gender_res, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + 
+  ggtitle("Punish out partisan women a woman")
+
+x <- lm_robust(chosen ~ edu + exp   + #use robust to cluster
+                    race + anger_cut + co_partisan * gender * gender_res * arm, 
+                  data=conjoint_data, cluster=ResponseId) 
+
+plot_model(x, SE=T, show.values = TRUE,
+           show.p = TRUE, value.size = 3, line.size = 0.5, dot.size = 1, 
+           digits = 3) +
+   ylim(-.15, .15) + 
+  theme_minimal() + 
+  ggtitle("Punish out partisan women a woman, depending on the policy condition")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## Conclusion
+### Summary of what we do, and do not, find:
+We don't seem to find what we were hoping for:
+
+* There is no significant effect of the policy domain on candidate gender
+* There is no effect of emotions on gender
+* There is an effect of co-partisanship on emotions
+* There is no effect from a respondent's gender. 
+
+
+Why we might not have found effects for the policy domain and gender:
+
+* The gender might not have been strong enough. Perhaps we should have used a picture instead of just the label male or female.
+* The policy domain might not have been strong enough. Perhaps immigration is not that clearly a masculine issue and covid not very clearly a feminine issue. E.g. Covid was also about China and immigration is also about 'dreamers'. In addition, we could have directly asked respondents to consider a candidate for a 'president who mainly has to deal with X'. Where X is the policy domain.  
+* Or we're just simply wrong and policy domain does not influence whether people prefer men or women. I think this is less likely, however, as the signs are in the expected direction. 
+
+
+What we do find:
+* Emotions have a strong influence on what people think of candidates. This effect is causal. 
+* Co-partisanship influences what people think of emotions (H4).
+
+
+### What we could do next:
+What we could do with these results:
+
+* We could present these results on emotions together with the Twitter results as a proof-of-concept for how one can causally confirm what you find in Twitter data. That is, we know and find that emotions are important for how voters see politicians. We show that this holds true on social media and we discuss a novel methodological way to, cheaply, confirm these patterns in a causal way. 
+* We could write the paper on hypothesis 4, if there is a gap here. 
+
+
+What we could do with our theory and hypotheses:
+Assuming we didn't find something because our treatments were not strong enough, then we could simply run the experiment again with different treatments. I.e. a stronger gender and a stronger policy domain treatment. 
+
+*The question is thus what we do with these results: write it up, and if so how? As well as what to do with our hypothesis and expectations: get funding somewhere and run the experiment again with different treatments or not?*
+
+
+
