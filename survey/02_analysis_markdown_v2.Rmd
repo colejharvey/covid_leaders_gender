@@ -349,11 +349,11 @@ conjoint_data_sub <- subset(conjoint_data, gender_res == "Female" & arm=="immi")
 # Get the results by copartisan and out partisan
 f <- chosen ~ Education + Experience + Gender + Race
 
-marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce_differences", by = ~Partisan)# for the left-right bins
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce", by = ~Partisan)# for the left-right bins
 marginalmeans$group <- marginalmeans$BY #add a grouping variable for the plot function
 
 plot(marginalmeans) + 
-  labs(x="Differences in the AMCE to choose a profile, for female respondents only: Immigration arm")  + ggplot2::facet_wrap(~BY, ncol = 4L) +
+  labs(x="The AMCE to choose a profile, for female respondents only: Immigration arm")  + ggplot2::facet_wrap(~BY, ncol = 4L) +
   geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
   geom_vline(xintercept = 0.5, linetype="dashed") +
   theme_set(theme_light(base_family = "Georgia")) +
@@ -374,10 +374,10 @@ Once again, the differences between partisans are not significant (thus neither 
 # The model
 f <- chosen ~ Education + Experience + Race + Partisan +  Trust
 
-marginalmeans <- cj(conjoint_data , f, id = ~ResponseId, estimate = "mm_differences", by=~Gender)
+marginalmeans <- cj(conjoint_data , f, id = ~ResponseId, estimate = "mm", by=~Gender)
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
-  labs(x="Differences in the MM to choose a profile: for trust")  + 
+  labs(x="The MM to choose a profile: for trust")  + 
   geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
   geom_vline(xintercept = 0.5, linetype="dashed") +
   theme_set(theme_light(base_family = "Georgia")) +
@@ -389,10 +389,10 @@ plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
 # The model
 f <- chosen ~ Education + Experience + Race + Partisan +  Anger
 
-marginalmeans <- cj(conjoint_data , f, id = ~ResponseId, estimate = "mm_differences", by=~Gender)
+marginalmeans <- cj(conjoint_data , f, id = ~ResponseId, estimate = "mm", by=~Gender)
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
-  labs(x="Differences in the MM to choose a profile: for anger")  + 
+  labs(x="The MM to choose a profile: for anger")  + 
   geom_point(aes(y=level, x=estimate),size = 2.2) + geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
   geom_vline(xintercept = 0.5, linetype="dashed") +
   theme_set(theme_light(base_family = "Georgia")) +
@@ -417,11 +417,11 @@ f <- chosen ~ Education + Experience + Race  + Anger
 # Only look at female candidates
 conjoint_data_sub <- subset(conjoint_data, Gender=="Female")
 
-marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce_differences", by=~Party)# for the left-right bins
+marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, estimate = "amce", by=~Party)# for the left-right bins
 
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
-  labs(x="Differences in the AMCE to choose a profile: the effect of anger for female candidates only")  + 
+  labs(x="The AMCE to choose a profile: the effect of anger for female candidates only")  + 
   geom_point(aes(y=level, x=estimate),size = 2.2) + 
   geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
   geom_vline(xintercept = 0.5, linetype="dashed") +
@@ -435,10 +435,10 @@ plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
 f <- chosen ~ Education + Experience + Race  + Trust
 
 marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, 
-                    estimate = "amce_differences", by=~Party)# for the left-right bins
+                    estimate = "amce", by=~Party)# for the left-right bins
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
-  labs(x="Differences in the AMCE to choose a profile: the effect of trust for female candidates only")  + 
+  labs(x="The AMCE to choose a profile: the effect of trust for female candidates only")  + 
   geom_point(aes(y=level, x=estimate),size = 2.2) + 
   geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
   geom_vline(xintercept = 0.5, linetype="dashed") +
@@ -461,7 +461,7 @@ f <- chosen ~ Education + Experience + Race + Partisan + Anger
 # Only look at candidates in the immigration arm
 conjoint_data_sub <- subset(conjoint_data, arm=="immi")
 
-marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by=~Gender)# for the left-right bins
+marginalmeans <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm", by=~Gender)# for the left-right bins
 marginalmeans$BY_2 <- "Immigration"
 marginalmeans$BY <- paste(marginalmeans$BY, marginalmeans$BY_2)
 
@@ -469,14 +469,14 @@ marginalmeans$BY <- paste(marginalmeans$BY, marginalmeans$BY_2)
 # Only look at candidates in the covid arm
 conjoint_data_sub <- subset(conjoint_data, arm=="covid")
 
-marginalmeans_cov <- cj(conjoint_data, f, id = ~ResponseId, estimate = "amce_differences", by=~Gender)# for the left-right bins
+marginalmeans_cov <- cj(conjoint_data, f, id = ~ResponseId, estimate = "mm", by=~Gender)# for the left-right bins
 marginalmeans_cov$BY_2 <- "Covid"
 marginalmeans_cov$BY <- paste(marginalmeans_cov$BY, marginalmeans_cov$BY_2)
 
 marginalmeans <- rbind(marginalmeans, marginalmeans_cov)
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
-  labs(x="Differences in the AMCE to choose a profile: the effect of anger for female candidates only")  + 
+  labs(x="The mm to choose a profile: the effect of anger for female candidates only")  + 
   geom_point(aes(y=level, x=estimate),size = 2.2) + 
   geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
   geom_vline(xintercept = 0.5, linetype="dashed") +
@@ -490,10 +490,10 @@ plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
 f <- chosen ~ Education + Experience + Race  + Trust
 
 marginalmeans <- cj(conjoint_data_sub, f, id = ~ResponseId, 
-                    estimate = "amce_differences", by=~Party)# for the left-right bins
+                    estimate = "mm", by=~Party)# for the left-right bins
 
 plot(marginalmeans) + ggplot2::facet_wrap(~BY, ncol = 4L) +
-  labs(x="Differences in the AMCE to choose a profile: the effect of trust for female candidates only")  + 
+  labs(x="The mm to choose a profile: the effect of trust for female candidates only")  + 
   geom_point(aes(y=level, x=estimate),size = 2.2) + 
   geom_linerange(aes(xmin=lower, xmax=upper), size=1.2) +
   geom_vline(xintercept = 0.5, linetype="dashed") +
