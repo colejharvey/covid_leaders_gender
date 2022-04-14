@@ -1,0 +1,251 @@
+---
+title: "Analysis of covid and immigration tweets by gender"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(stargazer)
+library(sjPlot)
+library(lubridate)
+library(here)
+library(MASS)
+
+tweet_data_immigration <- read.csv("C:/Users/colej/Documents/Research projects/covid_leaders_gender/Read only (do not track)/tweets_with_covariates_immigration.csv")
+tweet_data_covid <- read.csv("C:/Users/colej/Documents/Research projects/covid_leaders_gender/Data/20210128_tweets_with_covariates_fixed.csv")
+
+tweet_data_immigration <- tweet_data_immigration %>% mutate(n.words = str_count(text, boundary("word")))
+tweet_data_covid <- tweet_data_covid %>% mutate(n.words = str_count(text, boundary("word")))
+
+tweet_data_covid <- tweet_data_covid %>% mutate(cases_pc = cases / pop2019)
+tweet_data_covid <- tweet_data_covid %>% mutate(deaths_pc = deaths / pop2019)
+
+## Remove duplicates (not sure where they come from, but they're there)
+
+tweet_data_covid <- tweet_data_covid %>% distinct(text, .keep_all = T)
+tweet_data_immigration <- tweet_data_immigration %>% distinct(text, .keep_all = T)
+
+## Adding Trump 2016 share by state
+election2016 <- read.csv("C:/Users/colej/Documents/Research projects/covid_leaders_gender/Data/election_turnout.csv")
+election2016 <- election2016 %>% mutate(state = usdata::state2abbr(state))
+election2016 <- election2016 %>% dplyr::select(state, trumpshare)
+
+tweet_data_covid <- tweet_data_covid %>% left_join(election2016, by = "state")
+tweet_data_immigration <- tweet_data_immigration %>% left_join(election2016, by = "state")
+
+## Border state
+
+tweet_data_immigration <- tweet_data_immigration %>% mutate(border_state = ifelse(state == "TX" | state == "CA" | state == "AZ" | state == "NM", 1, 0))
+
+## AFINN score, NRC, and s140 score
+
+tweet_data_covid <- tweet_data_covid %>% mutate(affin_combined =  AFINN.posScore + AFINN.negScore)
+tweet_data_immigration <- tweet_data_immigration %>% mutate(affin_combined =  AFINN.posScore + AFINN.negScore)
+
+
+tweet_data_covid <- tweet_data_covid %>% mutate(s140_combined =  S140.posScore + S140.negScore)
+tweet_data_immigration <- tweet_data_immigration %>% mutate(s140_combined =  S140.posScore + S140.negScore)
+
+tweet_data_covid <- tweet_data_covid %>% mutate(nrcsent_combined =  NRC.Hash.Sent.posScore + NRC.Hash.Sent.negScore)
+tweet_data_immigration <- tweet_data_immigration %>% mutate(nrcsent_combined =  NRC.Hash.Sent.posScore + NRC.Hash.Sent.negScore)
+
+
+## Time to election
+election.day <- ymd("2020-11-03")
+tweet_data_covid <- tweet_data_covid %>% mutate(time_to_election = (int_length(interval(mdy(date.x), election.day)))/86400)
+tweet_data_immigration <- tweet_data_immigration %>% mutate(time_to_election = (int_length(interval(ymd(date), election.day)))/86400)
+
+## Up for election
+  ## Note: This is not in the models yet, because it is partial. Need to update with senators, and also check for retirements
+
+tweet_data_covid <- tweet_data_covid %>% mutate(reelect = ifelse(type == "rep", 1, ifelse(type == "gov" & state == "NC" | state == "WV" | state == "DE" | state == "NH" | state == "VT" | state == "IN" | state == "MO" | state == "ND" | state == "MT" | state == "UT" | state == "WA", 1, 0)))
+
+
+## Removing "epidemic" due to many false positives (e.g. opioid epidemic)
+
+tweet_data_covid <- tweet_data_covid %>% mutate(epidemic_tweet = ifelse(str_detect(tweet_data_covid$text, "epidemic") == TRUE, 1, 0))
+tweet_data_covid <- tweet_data_covid %>% filter(epidemic_tweet == 0)
+
+
+
+```
+
+
+
+## Summary by type
+
+Just for a general sense of the distribution of the observations, we see that there are about 2.5x as many observations from male politicians than female politicians for the covid dataset. Broken out by type of politician, we see that male politicians' tweets are observed more in every category. though the imbalance is most extreme for governors.
+
+```{r}
+tweet_data_covid %>% group_by(gender) %>% summarize(n())
+
+tweet_data_covid %>% group_by(type, gender) %>% summarize(n())
+
+tweet_data_covid %>% group_by(gender) %>% summarize(avg_afinn = mean(affin_combined))
+
+
+```
+For the immigration dataset, we have only a small number of observations from governors (this makes sense, since most governors have little to do with immigration issues). The ratio of male to female observations is less than 2, and is about the same for both senators and representatives. 
+```{r}
+tweet_data_immigration %>% group_by(gender) %>% summarize(n())
+
+tweet_data_immigration %>% group_by(type, gender) %>% summarize(n())
+
+```
+
+## No emotions
+
+Here are baseline models, using a standard set of controls + issue-relevant controls (e.g. case and death numbers for covid and a border-state dummy for immigration). The models are negative binomial regressions, since the DV (favorites) is an overdispersed count variable. The results show that male politicians generally produce lower favorite counts on their posts than women. This is in keeping with our expectations for covid tweets, but the finding that this penalty for men is substantially larger in the immigration models runs against our expectations. However, it may not be appropriate to compare the size of coefficients across models, given different variables as well as a different overall media environment (pre-covid vs. covid-era). It occurs to me that there are some other variables we might consider adding to this analysis, including whether or not each politician is up for re-election in 2020, and how many days there are between the tweet and the election.
+
+```{r, warning=FALSE, message=FALSE}
+model.base.covid <- glm.nb(favorite_count ~ gender + retweet_count + party + followers_count + type + n.words + time_to_election + nrcsent_combined +    cases_pc + deaths_pc + trumpshare, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.base.covid)
+
+
+model.base.immigration <- glm.nb(favorite_count ~ gender + retweet_count + party + followers_count + type + n.words + time_to_election + nrcsent_combined + trumpshare + border_state, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.base.immigration)
+
+```
+
+## Gender by type
+
+Breaking out the effect by the speaker's elected office shows some underlying variation that is more in keeping with our predictions. On the subject of covid, female governors generate significantly more positive engagement than their male counterparts; there is also a small but significant boost for female representatives. We do not see this effect for female governors in the immigration context, though there is still a small boost for female representatives. (Note that the color scales are reversed between the two plots for some reason.)
+
+```{r warning=FALSE, message=FALSE}
+model.gxt.covid <- glm.nb(favorite_count ~ gender*type + retweet_count + party + followers_count + type + n.words + time_to_election +  nrcsent_combined +   cases_pc + deaths_pc + trumpshare, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxt.covid)
+
+
+model.gxt.immigration <- glm.nb(favorite_count ~ gender*type + retweet_count + party + followers_count + type + n.words + time_to_election + nrcsent_combined + trumpshare + border_state, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxt.immigration)
+
+plot_type_covid <- plot_model(model.gxt.covid, type = "pred", terms = c("type", "gender"))
+plot_type_immigration <- plot_model(model.gxt.immigration, type = "pred", terms = c("type", "gender"))
+
+
+p.type.covid <- plot_type_covid + scale_color_manual(values = c("M" = "red",
+                                                "F" = "blue")) +
+  xlab("Politician type") + ylab("Favorite count") + theme_bw()
+
+p.type.imm <- plot_type_immigration  + scale_color_manual(values = c("M" = "red",
+                                                "F" = "blue")) +
+  xlab("Politician type") + ylab("Favorite count") + theme_bw()
+
+
+## Table
+
+stargazer::stargazer(model.base.covid, model.gxt.covid, model.base.immigration, model.gxt.immigration, digits = 2)
+
+## Plots
+
+p.type.covid
+p.type.imm
+
+png(file = here::here("p_type_covid.png"))
+p.type.covid
+dev.off()
+
+png(file = here::here("p_type_imm.png"))
+p.type.imm
+dev.off()
+```
+
+## By party
+
+
+```{r warning=FALSE, message=FALSE}
+model.gxp.covid <- glm.nb(favorite_count ~ gender*party + type + retweet_count + party + followers_count + type + n.words + time_to_election +  affin_combined + cases + deaths + cases_pc + deaths_pc + trumpshare, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxp.covid)
+
+
+model.gxp.immigration <- glm.nb(favorite_count ~ gender*party + type + retweet_count + party + followers_count + type + n.words + time_to_election + affin_combined + trumpshare + border_state, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxp.immigration)
+
+plot_model(model.gxp.covid, type = "pred", terms = c("party", "gender"))
+
+plot_model(model.gxp.immigration, type = "pred", terms = c("party", "gender"))
+
+```
+
+## By sentiment
+
+
+```{r warning=FALSE, message=FALSE}
+model.gxaf.covid <- glm.nb(favorite_count ~ gender*affin_combined + type + retweet_count + party + followers_count + type + n.words + time_to_election +  affin_combined + cases + deaths + cases_pc + deaths_pc + trumpshare, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxaf.covid)
+
+
+model.gxaf.immigration <- glm.nb(favorite_count ~ gender*affin_combined + type + retweet_count + party + followers_count + type + n.words + time_to_election + affin_combined + trumpshare + border_state, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxaf.immigration)
+
+plot_model(model.gxaf.covid, type = "pred", terms = c("affin_combined", "gender"))
+plot_model(model.gxaf.immigration, type = "pred", terms = c("affin_combined", "gender"))
+
+```
+
+
+## Including emotions as controls
+
+Including emotion scores for each tweet (here simply measured as the number of words corresponding to each emotion in the tweet) does not meaningfully change the results from the base models.
+
+```{r warning=FALSE, message=FALSE}
+model.emotions.covid <- glm.nb(favorite_count ~ gender + retweet_count + party + followers_count + type + n.words + time_to_election +   cases + deaths + cases_pc + deaths_pc + trumpshare + NRC.10.trust + NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.emotions.covid)
+
+
+model.emotions.immigration <- glm.nb(favorite_count ~ gender + retweet_count + party + followers_count + type + n.words + time_to_election + trumpshare + border_state + NRC.10.trust + NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.emotions.immigration)
+```
+
+## Anger and gender
+
+```{r warning=FALSE, message=FALSE}
+model.gxa.covid <- glm.nb(favorite_count ~ gender*NRC.10.anger + retweet_count + party + followers_count + type + n.words + time_to_election +   cases + deaths + cases_pc + deaths_pc + trumpshare + NRC.10.trust + NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxa.covid)
+
+
+model.gxa.immigration <- glm.nb(favorite_count ~ gender*NRC.10.anger + retweet_count + party + followers_count + type + n.words + time_to_election + trumpshare + border_state + NRC.10.trust + NRC.10.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxa.immigration)
+
+plot_model(model.gxa.covid, type = "pred", terms = c("NRC.10.anger", "gender"))
+plot_model(model.gxa.immigration, type = "pred", terms = c("NRC.10.anger", "gender"))
+```
+## Alternative measure of emotion
+
+Using this alternative measure of emotionality does indicate that male politicians can gain more engagement by using anger, while female politicians do not (in the covid setting). In the immigration setting, we do not see as stark a difference. 
+
+```{r warning=FALSE, message=FALSE}
+model.gxa.covid2 <- glm.nb(favorite_count ~ gender*NRC.10.Expanded.anger + retweet_count + party + followers_count + type + n.words + time_to_election +   cases + deaths + cases_pc + deaths_pc + trumpshare + NRC.10.Expanded.trust  + NRC.10.Expanded.anticipation + NRC.10.Expanded.disgust + NRC.10.Expanded.fear + NRC.10.Expanded.joy + NRC.10.Expanded.sadness + NRC.10.Expanded.surprise, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxa.covid2)
+
+
+model.gxa.immigration2 <- glm.nb(favorite_count ~ gender*NRC.10.Expanded.anger + retweet_count + party + followers_count + type + n.words + time_to_election + trumpshare + border_state + NRC.10.Expanded.trust +  NRC.10.Expanded.anticipation + NRC.10.Expanded.disgust + NRC.10.Expanded.fear + NRC.10.Expanded.joy + NRC.10.Expanded.sadness + NRC.10.Expanded.surprise, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxa.immigration2)
+
+plot_model(model.gxa.covid2, type = "pred", terms = c("NRC.10.Expanded.anger", "gender"))
+plot_model(model.gxa.immigration2, type = "pred", terms = c("NRC.10.Expanded.anger", "gender"))
+```
+
+
+
+## Anger gender and type (3-way interaction)
+
+However, when we break into the three-way interaction, we see that female governors (in particular) can benefit from using angrier language
+
+```{r warning=FALSE, message=FALSE}
+model.gxaxt.covid <- glm.nb(favorite_count ~ gender*NRC.10.Expanded.anger*type + retweet_count + party + followers_count + type + n.words + time_to_election +   cases + deaths + cases_pc + deaths_pc + trumpshare + NRC.10.trust + NRC.10.Expanded.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise, data = tweet_data_covid %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxaxt.covid)
+
+
+model.gxaxt.immigration <- glm.nb(favorite_count ~ gender*NRC.10.Expanded.anger*type + retweet_count + party + followers_count + type + n.words + time_to_election + trumpshare + border_state + NRC.10.trust + NRC.10.Expanded.anger + NRC.10.anticipation + NRC.10.disgust + NRC.10.fear + NRC.10.joy + NRC.10.sadness + NRC.10.surprise, data = tweet_data_immigration %>% filter(party == "Republican" | party == "Democrat" & screen_name_lower != "joebiden" & screen_name_lower != "realdonaldtrump" & screen_name_lower != "mike_pence" & screen_name_lower != "vp" & screen_name_lower != "thedemocrats" & screen_name_lower != "gop" & screen_name_lower != "presssec"))
+summary(model.gxaxt.immigration)
+
+plot_model(model.gxaxt.covid, type = "pred", terms = c("gender", "NRC.10.Expanded.anger [0, 1, 2]", "type"))
+plot_model(model.gxaxt.immigration, type = "pred", terms = c("gender", "NRC.10.Expanded.anger [0, 1, 2]", "type"))
+
+```
+
+Generally speaking, the results here are mixed. This should be framed as a motivation for the experimental project. The Twitter environment is artificial in two ways. First, it is a narrow slice of the US population as a whole, which may lead to unrepresentative patterns of 'liking' politicians' behavior. Second, all of our observations here already represent highly successful politicians (elected to statewide / federal office). They are likely to be doing things 'right,' already, and already have a reputation among their followers. So we use the experiment to show how people respond to candidates in the different issues areas without these possible confounders. 
